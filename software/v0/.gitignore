@@ -1,0 +1,16 @@
+# Recorded episodes (raw frames) — local artifacts, can be large
+episodes/
+
+# Dev-console local state (recipes.json, runs.json, app_config.json)
+data/
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/

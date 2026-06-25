@@ -1,0 +1,16 @@
+# OpenMartian v0 host pipeline — deliberately dependency-light.
+#
+# Runtime deps (all HTTP/stdlib): only `requests` is third-party.
+requests>=2.28
+python-dotenv>=1.0   # optional: auto-loads .env if present
+
+# Dev console web server (server/)
+fastapi>=0.110
+uvicorn>=0.27
+
+# System deps (NOT pip):
+#   - ffmpeg   : RTSP frame capture (already present; your `webcam` alias uses ffplay)
+#   - ollama   : local VLM serving (gemma3:4b / llava / llama3.2-vision:11b)
+#
+# Cloud backend (Claude) needs ANTHROPIC_API_KEY in the environment; no SDK
+# required — we call the Messages API directly over HTTP.
