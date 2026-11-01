@@ -1,0 +1,19 @@
+# Added 2026-11-01: never commit secrets, environments, caches or auto-backups
+.env
+.env.*
+!.env.example
+*.pem
+*.ppk
+venv/
+.venv/
+env/
+node_modules/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*-backups/
+*.FCBak
+*.kicad_prl
+fp-info-cache
+.claude/settings.local.json
+.DS_Store

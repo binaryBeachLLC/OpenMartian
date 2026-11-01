@@ -26,7 +26,7 @@ except Exception:  # pragma: no cover
     pass
 
 from . import state
-from .routers import config, episodes, models, process, recipes, schemas, webcam
+from .routers import config, episodes, experiment, models, process, recipes, schemas, webcam
 
 app = FastAPI(
     title="OpenMartian v0 dev console",
@@ -42,7 +42,8 @@ app.add_middleware(
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 for _router in (webcam.router, config.router, episodes.router,
-                recipes.router, schemas.router, models.router, process.router):
+                recipes.router, schemas.router, models.router, process.router,
+                experiment.router):
     app.include_router(_router)
 
 # Serve static assets (vendored React/Babel, etc.) so the UI needs no public CDN.
@@ -63,3 +64,12 @@ def index() -> HTMLResponse:
     if not idx.exists():
         return HTMLResponse("<h1>OpenMartian v0 dev console</h1><p>Frontend not built yet.</p>")
     return HTMLResponse(idx.read_text())
+
+
+@app.get("/experiment", include_in_schema=False)
+def experiment_console() -> HTMLResponse:
+    """The experiment platform UI: upload video -> label -> derive -> run -> matrix."""
+    page = STATIC_DIR / "experiment.html"
+    if not page.exists():
+        return HTMLResponse("<h1>Experiment console</h1><p>Frontend not built yet.</p>")
+    return HTMLResponse(page.read_text())

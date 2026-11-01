@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenMartian — Experiment Console</title>
+<!-- Vendored locally so the app needs NO public internet (works on a VPN-only PC). -->
+<script crossorigin src="/static/vendor/react.production.min.js"></script>
+<script crossorigin src="/static/vendor/react-dom.production.min.js"></script>
+<script src="/static/vendor/babel.min.js"></script>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --border:#30363d;
+    --fg:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --accent2:#1f6feb;
+    --green:#3fb950; --red:#f85149; --yellow:#d29922; --purple:#bc8cff;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; }
+  body { background:var(--bg); color:var(--fg); font-family:var(--mono); font-size:13px; line-height:1.45; }
+  #root { height:100%; }
+  a { color:var(--accent); text-decoration:none; }
+  h1,h2,h3,h4 { margin:0 0 8px 0; font-weight:600; }
+  h2 { font-size:15px; } h3 { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  button { background:var(--panel2); color:var(--fg); border:1px solid var(--border); border-radius:5px;
+    padding:5px 10px; font-family:inherit; font-size:12px; cursor:pointer; transition:.12s; }
+  button:hover:not(:disabled) { border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--accent2); border-color:var(--accent2); color:#fff; }
+  button.primary:hover:not(:disabled) { background:var(--accent); border-color:var(--accent); }
+  button.danger { color:var(--red); border-color:#5a2a2a; }
+  button.danger:hover:not(:disabled) { background:#3a1414; border-color:var(--red); }
+  button.sm { padding:3px 7px; font-size:11px; }
+  input,textarea,select { background:#0b0f14; color:var(--fg); border:1px solid var(--border);
+    border-radius:5px; padding:5px 8px; font-family:inherit; font-size:12px; width:100%; }
+  input:focus,textarea:focus,select:focus { outline:none; border-color:var(--accent); }
+  textarea { resize:vertical; }
+  label { display:block; font-size:11px; color:var(--muted); margin-bottom:3px; }
+  .field { margin-bottom:8px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+  .row > * { flex:1; min-width:60px; }
+  .wrap { max-width:1180px; margin:0 auto; padding:16px; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px; }
+  .panel-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600;
+    border:1px solid var(--border); text-transform:uppercase; letter-spacing:.4px; }
+  .badge.green { background:#0f2a16; color:var(--green); border-color:#1f5128; }
+  .badge.red { background:#2a0f0f; color:var(--red); border-color:#5a2424; }
+  .badge.yellow { background:#2a2410; color:var(--yellow); border-color:#5a4f1f; }
+  .badge.blue { background:#0f1f2a; color:var(--accent); border-color:#1f455a; }
+  .badge.gray { background:#1c2128; color:var(--muted); }
+  .badge.purple { background:#221a2e; color:var(--purple); border-color:#46305a; }
+  .muted { color:var(--muted); }
+  .mono { font-family:var(--mono); }
+  .err { color:var(--red); font-size:11px; background:#2a0f0f; border:1px solid #5a2424;
+    border-radius:5px; padding:5px 8px; margin:6px 0; white-space:pre-wrap; word-break:break-word; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:14px; flex-wrap:wrap; }
+  .tab { padding:8px 14px; cursor:pointer; border:1px solid transparent; border-bottom:none;
+    border-radius:6px 6px 0 0; color:var(--muted); font-size:12px; }
+  .tab:hover { color:var(--fg); }
+  .tab.active { color:#fff; background:var(--panel); border-color:var(--border); }
+  .tab .step { display:inline-block; width:16px; height:16px; line-height:16px; text-align:center;
+    border-radius:50%; background:#0b0f14; border:1px solid var(--border); font-size:10px; margin-right:6px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th,td { text-align:left; padding:5px 7px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; text-transform:uppercase; font-size:10px; letter-spacing:.4px; }
+  tr:hover td { background:var(--panel2); }
+  pre { background:#0b0f14; border:1px solid var(--border); border-radius:5px; padding:8px;
+    overflow:auto; font-size:11px; margin:4px 0; max-height:300px; }
+  .list-item { display:flex; gap:8px; align-items:center; padding:7px 9px; border:1px solid var(--border);
+    border-radius:6px; margin-bottom:6px; cursor:pointer; background:var(--panel2); }
+  .list-item:hover { border-color:var(--accent); }
+  .list-item.sel { border-color:var(--accent); background:#11233a; }
+  .grid2 { display:grid; grid-template-columns:300px 1fr; gap:14px; }
+  @media(max-width:760px){ .grid2 { grid-template-columns:1fr; } }
+  .frame-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:6px; }
+  .frame-grid img { width:100%; height:64px; object-fit:cover; border-radius:4px; background:#000; border:1px solid var(--border); }
+  .progress { background:#0b0f14; border:1px solid var(--border); border-radius:6px; height:16px; overflow:hidden; position:relative; }
+  .progress .fill { background:linear-gradient(90deg,var(--accent2),var(--accent)); height:100%; transition:width .3s; min-width:2px; }
+  .progress .lbl { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; text-shadow:0 1px 2px #000; }
+  .matrix-cell { background:#0b0f14; border:1px solid var(--border); border-radius:6px; padding:8px; }
+  .matrix-cell .acc { font-size:20px; font-weight:700; }
+  .acc.hi { color:var(--green); } .acc.mid { color:var(--yellow); } .acc.lo { color:var(--red); } .acc.na { color:var(--muted); }
+  .toast-wrap { position:fixed; top:12px; right:12px; z-index:2000; display:flex; flex-direction:column; gap:6px; max-width:380px; }
+  .toast { background:#2a0f0f; border:1px solid var(--red); color:#ffb3ad; padding:8px 12px; border-radius:6px; font-size:11px; box-shadow:0 2px 12px #0008; }
+  .toast.ok { background:#0f2a16; border-color:var(--green); color:#9be7a8; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:11px; }
+  .kv .k { color:var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// -- tiny API client -------------------------------------------------------- //
+const API = "/api/experiment";
+async function api(path, opts) {
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  const ct = r.headers.get("content-type") || "";
+  return ct.includes("application/json") ? r.json() : r.text();
+}
+const jpost = (p, b) => api(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) });
+const jdel = (p) => api(p, { method: "DELETE" });
+
+function useToasts() {
+  const [toasts, setToasts] = useState([]);
+  const push = useCallback((msg, ok) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(t => [...t, { id, msg, ok }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4500);
+  }, []);
+  const view = (
+    <div className="toast-wrap">
+      {toasts.map(t => <div key={t.id} className={"toast" + (t.ok ? " ok" : "")}>{t.msg}</div>)}
+    </div>
+  );
+  return [push, view];
+}
+
+// -------------------------------------------------------------------------- //
+// DATASETS tab: upload video -> label                                        //
+// -------------------------------------------------------------------------- //
+function DatasetsTab({ toast, onSelectDerive }) {
+  const [datasets, setDatasets] = useState([]);
+  const [sel, setSel] = useState(null);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef();
+
+  const load = useCallback(async () => {
+    const ds = await api("/datasets");
+    setDatasets(ds);
+    if (sel) { const fresh = ds.find(d => d.id === sel.id); if (fresh) setSel(fresh); }
+  }, [sel]);
+  useEffect(() => { load().catch(e => toast(e.message)); }, []);
+
+  const create = async () => {
+    if (!name.trim()) return;
+    try { const d = await jpost("/datasets", { name }); setName(""); await load(); setSel(d); toast("dataset created", true); }
+    catch (e) { toast(e.message); }
+  };
+  const upload = async () => {
+    const f = fileRef.current.files[0];
+    if (!f || !sel) return;
+    setBusy(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const d = await api(`/datasets/${sel.id}/videos`, { method: "POST", body: fd });
+      setSel(d); fileRef.current.value = ""; await load();
+      toast(`uploaded ${d.uploaded.filename} (${d.uploaded.duration_s}s)`, true);
+    } catch (e) { toast(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="grid2">
+      <div>
+        <div className="panel">
+          <div className="panel-head"><h2>Datasets</h2></div>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <input placeholder="new dataset name" value={name} onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && create()} />
+            <button className="primary" style={{ flex: "0 0 auto" }} onClick={create}>+ create</button>
+          </div>
+          {datasets.length === 0 && <div className="muted">No datasets yet. Create one, then upload a raw video.</div>}
+          {datasets.map(d => (
+            <div key={d.id} className={"list-item" + (sel && sel.id === d.id ? " sel" : "")} onClick={() => setSel(d)}>
+              <div style={{ flex: 1 }}>
+                <div>{d.name}</div>
+                <div className="muted" style={{ fontSize: 10 }}>
+                  {d.video_paths.length} video(s) · {d.labels.length} label(s)
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        {!sel && <div className="panel muted">Select a dataset to upload footage and add labels.</div>}
+        {sel && <DatasetDetail ds={sel} fileRef={fileRef} upload={upload} busy={busy}
+          reload={load} setSel={setSel} toast={toast} onSelectDerive={onSelectDerive} />}
+      </div>
+    </div>
+  );
+}
+
+function DatasetDetail({ ds, fileRef, upload, busy, reload, setSel, toast, onSelectDerive }) {
+  const [lbl, setLbl] = useState({ video: ds.video_paths[0] || "", t_start_ms: 0, t_end_ms: 3000, shape: "presence", value: true, label: "" });
+  const [spec, setSpec] = useState({ fps: 1.0, frames_per_episode: 4, frame_res: "320x240", jpeg_q: 5, stride_s: 0 });
+  const [maxEp, setMaxEp] = useState("");
+  const [deriving, setDeriving] = useState(null);
+
+  useEffect(() => { if (!lbl.video && ds.video_paths[0]) setLbl(l => ({ ...l, video: ds.video_paths[0] })); }, [ds]);
+
+  const addLabel = async () => {
+    if (!lbl.video) return toast("upload a video first");
+    try {
+      await jpost(`/datasets/${ds.id}/labels`, { ...lbl, value: lbl.shape === "count" ? Number(lbl.value) : true });
+      await reload(); toast("label added", true);
+    } catch (e) { toast(e.message); }
+  };
+  const delLabel = async (id) => { try { await jdel(`/datasets/${ds.id}/labels/${id}`); await reload(); } catch (e) { toast(e.message); } };
+
+  const derive = async () => {
+    try {
+      const body = { spec: { ...spec, stride_s: spec.stride_s ? Number(spec.stride_s) : null }, max_episodes: maxEp ? Number(maxEp) : null };
+      const job = await jpost(`/datasets/${ds.id}/derive`, body);
+      setDeriving(job.job_id);
+      toast("derivation started", true);
+    } catch (e) { toast(e.message); }
+  };
+
+  // poll the derive job
+  useEffect(() => {
+    if (!deriving) return;
+    const t = setInterval(async () => {
+      try {
+        const j = await api(`/jobs/${deriving}`);
+        if (j.status !== "running") {
+          clearInterval(t); setDeriving(null);
+          if (j.status === "done") { toast(`derived ${j.result.episode_count} episodes`, true); onSelectDerive && onSelectDerive(j.result.derivation_id); }
+          else toast("derive failed: " + j.error);
+        }
+      } catch (e) { clearInterval(t); setDeriving(null); }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [deriving]);
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="panel-head">
+          <h2>{ds.name} <span className="badge gray">{ds.id}</span></h2>
+          <button className="danger sm" onClick={async () => { if (confirm("delete dataset?")) { await jdel(`/datasets/${ds.id}`); setSel(null); reload(); } }}>delete</button>
+        </div>
+        <h3>1 · Raw video (the input)</h3>
+        <div className="row" style={{ marginBottom: 8 }}>
+          <input type="file" accept="video/*" ref={fileRef} />
+          <button className="primary" style={{ flex: "0 0 auto" }} disabled={busy} onClick={upload}>{busy ? "uploading…" : "upload"}</button>
+        </div>
+        {ds.video_paths.map(v => <span key={v} className="badge blue" style={{ marginRight: 6 }}>{v}</span>)}
+      </div>
+
+      <div className="panel">
+        <h3>2 · Labels (time-keyed ground truth)</h3>
+        <div className="row">
+          <div style={{ flex: 2 }}><label>video</label>
+            <select value={lbl.video} onChange={e => setLbl({ ...lbl, video: e.target.value })}>
+              {ds.video_paths.map(v => <option key={v} value={v}>{v}</option>)}
+            </select></div>
+          <div><label>shape</label>
+            <select value={lbl.shape} onChange={e => setLbl({ ...lbl, shape: e.target.value })}>
+              <option value="presence">presence</option><option value="count">count</option><option value="anticipate">anticipate</option>
+            </select></div>
+          <div><label>t_start (ms)</label><input type="number" value={lbl.t_start_ms} onChange={e => setLbl({ ...lbl, t_start_ms: Number(e.target.value) })} /></div>
+          <div><label>t_end (ms)</label><input type="number" value={lbl.t_end_ms} onChange={e => setLbl({ ...lbl, t_end_ms: Number(e.target.value) })} /></div>
+          {lbl.shape === "count" && <div><label>count</label><input type="number" value={lbl.value} onChange={e => setLbl({ ...lbl, value: e.target.value })} /></div>}
+          <div style={{ flex: 2 }}><label>label text</label><input value={lbl.label} onChange={e => setLbl({ ...lbl, label: e.target.value })} placeholder="condition description" /></div>
+          <button className="primary" style={{ flex: "0 0 auto" }} onClick={addLabel}>+ label</button>
+        </div>
+        <table style={{ marginTop: 8 }}><tbody>
+          {ds.labels.map(l => (
+            <tr key={l.id}>
+              <td><span className="badge purple">{l.shape}</span></td>
+              <td>{l.video}</td><td>{l.t_start_ms}–{l.t_end_ms}ms</td>
+              <td>{String(l.value)}</td><td>{l.label}</td>
+              <td><button className="danger sm" onClick={() => delLabel(l.id)}>×</button></td>
+            </tr>
+          ))}
+        </tbody></table>
+        <div className="muted" style={{ fontSize: 10, marginTop: 6 }}>Labels key to source-video time; every derivation inherits them by overlap. (Label Studio sync is a documented seam.)</div>
+      </div>
+
+      <div className="panel">
+        <h3>3 · Derive episodes (fps / fpe / res sweep over fixed footage)</h3>
+        <div className="row">
+          <div><label>fps</label><input type="number" step="0.5" value={spec.fps} onChange={e => setSpec({ ...spec, fps: Number(e.target.value) })} /></div>
+          <div><label>frames/episode</label><input type="number" value={spec.frames_per_episode} onChange={e => setSpec({ ...spec, frames_per_episode: Number(e.target.value) })} /></div>
+          <div><label>resolution</label><input value={spec.frame_res} onChange={e => setSpec({ ...spec, frame_res: e.target.value })} /></div>
+          <div><label>jpeg_q</label><input type="number" value={spec.jpeg_q} onChange={e => setSpec({ ...spec, jpeg_q: Number(e.target.value) })} /></div>
+          <div><label>stride_s (0=auto)</label><input type="number" step="0.5" value={spec.stride_s} onChange={e => setSpec({ ...spec, stride_s: e.target.value })} /></div>
+          <div><label>max episodes</label><input type="number" value={maxEp} onChange={e => setMaxEp(e.target.value)} placeholder="all" /></div>
+          <button className="primary" style={{ flex: "0 0 auto" }} disabled={!!deriving || ds.video_paths.length === 0} onClick={derive}>{deriving ? "deriving…" : "derive →"}</button>
+        </div>
+        <div className="muted" style={{ fontSize: 10, marginTop: 6 }}>window = {spec.frames_per_episode}/{spec.fps} = {(spec.frames_per_episode / spec.fps).toFixed(1)}s per episode. Then go to the Derivations tab.</div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------- //
+// DERIVATIONS tab: browse episode sets                                        //
+// -------------------------------------------------------------------------- //
+function DerivationsTab({ toast, focusDer, onMakeExperiment }) {
+  const [ders, setDers] = useState([]);
+  const [sel, setSel] = useState(null);
+  const [eps, setEps] = useState([]);
+
+  const load = useCallback(async () => { setDers(await api("/derivations")); }, []);
+  useEffect(() => { load().catch(e => toast(e.message)); }, []);
+  useEffect(() => { if (focusDer) { api("/derivations").then(ds => { setDers(ds); const d = ds.find(x => x.id === focusDer); if (d) setSel(d); }); } }, [focusDer]);
+  useEffect(() => { if (sel) api(`/derivations/${sel.id}/episodes`).then(setEps).catch(e => toast(e.message)); else setEps([]); }, [sel]);
+
+  return (
+    <div className="grid2">
+      <div className="panel">
+        <h2>Derivations</h2>
+        {ders.length === 0 && <div className="muted">None yet — derive episodes from a dataset.</div>}
+        {ders.map(d => (
+          <div key={d.id} className={"list-item" + (sel && sel.id === d.id ? " sel" : "")} onClick={() => setSel(d)}>
+            <div style={{ flex: 1 }}>
+              <div>{d.spec.fps}fps · {d.spec.frames_per_episode}fpe · {d.spec.frame_res}</div>
+              <div className="muted" style={{ fontSize: 10 }}>{d.episode_ids.length} episodes · {d.id}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div>
+        {!sel && <div className="panel muted">Select a derivation to browse its episodes.</div>}
+        {sel && (
+          <div className="panel">
+            <div className="panel-head">
+              <h2>{sel.id} <span className="badge gray">{sel.spec.fps}fps/{sel.spec.frames_per_episode}fpe/{sel.spec.frame_res}</span></h2>
+              <div>
+                <button className="primary sm" onClick={() => onMakeExperiment(sel.id)}>create experiment →</button>
+                <button className="danger sm" style={{ marginLeft: 6 }} onClick={async () => { if (confirm("delete derivation?")) { await jdel(`/derivations/${sel.id}`); setSel(null); load(); } }}>delete</button>
+              </div>
+            </div>
+            {eps.map(ep => (
+              <div key={ep.episode_id} style={{ marginBottom: 10 }}>
+                <div className="muted" style={{ fontSize: 10, marginBottom: 3 }}>
+                  {ep.episode_id} · {ep.src_video} · window {ep.src_window_ms && ep.src_window_ms.join("–")}ms
+                </div>
+                <div className="frame-grid">
+                  {ep.frames.map(f => <img key={f.index} src={f.url} loading="lazy" />)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------- //
+// EXPERIMENTS tab: configure arm/model/recipes, run                           //
+// -------------------------------------------------------------------------- //
+function ExperimentsTab({ toast, focusDer, models, arms }) {
+  const [exps, setExps] = useState([]);
+  const [ders, setDers] = useState([]);
+  const [form, setForm] = useState({ derivation_id: focusDer || "", arm: "direct", provider: "ollama", model_id: "gemma3:4b",
+    recipes: "Is there a man standing in the frame?", shape: "presence", name: "", temperature: 0 });
+  const [runningJob, setRunningJob] = useState(null);
+
+  const load = useCallback(async () => { setExps(await api("/experiments")); setDers(await api("/derivations")); }, []);
+  useEffect(() => { load().catch(e => toast(e.message)); }, []);
+  useEffect(() => { if (focusDer) setForm(f => ({ ...f, derivation_id: focusDer })); }, [focusDer]);
+
+  const create = async () => {
+    if (!form.derivation_id) return toast("pick a derivation");
+    try {
+      await jpost("/experiments", {
+        derivation_id: form.derivation_id, arm: form.arm, name: form.name,
+        objective_model: { provider: form.provider, model_id: form.model_id, temperature: Number(form.temperature) },
+        recipes: form.recipes.split("\n").map(s => s.trim()).filter(Boolean),
+        meta: { shape: form.shape },
+      });
+      await load(); toast("experiment created", true);
+    } catch (e) { toast(e.message); }
+  };
+
+  const run = async (exp, noCost) => {
+    try { const j = await jpost(`/experiments/${exp.id}/run`, { no_cost: noCost }); setRunningJob({ ...j, exp: exp.id }); toast(noCost ? "no-cost run started" : "run started", true); }
+    catch (e) { toast(e.message); }
+  };
+  useEffect(() => {
+    if (!runningJob) return;
+    const t = setInterval(async () => {
+      try {
+        const j = await api(`/jobs/${runningJob.job_id}`);
+        setRunningJob(rj => ({ ...rj, ...j }));
+        if (j.status !== "running") { clearInterval(t); if (j.status === "done") toast(`run done: ${j.result.n_results} trials`, true); else toast("run failed: " + j.error); setTimeout(() => setRunningJob(null), 2500); }
+      } catch (e) { clearInterval(t); }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [runningJob && runningJob.job_id]);
+
+  const claudeModels = (models || []).filter(m => m.backend === "claude");
+  const ollamaModels = (models || []).filter(m => m.backend === "ollama" && m.available);
+
+  return (
+    <div>
+      <div className="panel">
+        <h2>New experiment</h2>
+        <div className="row">
+          <div style={{ flex: 2 }}><label>derivation</label>
+            <select value={form.derivation_id} onChange={e => setForm({ ...form, derivation_id: e.target.value })}>
+              <option value="">— pick —</option>
+              {ders.map(d => <option key={d.id} value={d.id}>{d.id} · {d.spec.fps}fps/{d.spec.frames_per_episode}fpe · {d.episode_ids.length} ep</option>)}
+            </select></div>
+          <div><label>arm</label>
+            <select value={form.arm} onChange={e => setForm({ ...form, arm: e.target.value })}>
+              {(arms.known || ["direct"]).map(a => <option key={a} value={a} disabled={!(arms.implemented || []).includes(a)}>{a}{(arms.implemented || []).includes(a) ? "" : " (seam)"}</option>)}
+            </select></div>
+          <div><label>shape</label>
+            <select value={form.shape} onChange={e => setForm({ ...form, shape: e.target.value })}>
+              <option value="presence">presence</option><option value="count">count</option><option value="anticipate">anticipate</option>
+            </select></div>
+        </div>
+        <div className="row">
+          <div><label>backend</label>
+            <select value={form.provider} onChange={e => setForm({ ...form, provider: e.target.value, model_id: e.target.value === "claude" ? (claudeModels[0] && claudeModels[0].model || "claude-haiku-4-5-20251001") : (ollamaModels[0] && ollamaModels[0].model || "gemma3:4b") })}>
+              <option value="ollama">ollama (local)</option><option value="claude">claude (cloud · paid)</option>
+            </select></div>
+          <div style={{ flex: 2 }}><label>model</label>
+            <select value={form.model_id} onChange={e => setForm({ ...form, model_id: e.target.value })}>
+              {(form.provider === "claude" ? claudeModels : ollamaModels).map(m => <option key={m.model} value={m.model}>{m.model}{m.vision ? "" : " (text-only!)"}</option>)}
+            </select></div>
+          <div><label>temperature</label><input type="number" step="0.1" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} /></div>
+          <div style={{ flex: 2 }}><label>name (optional)</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+        </div>
+        <div className="field"><label>recipes (one question per line — these are the recipe-conditioned queries)</label>
+          <textarea rows="3" value={form.recipes} onChange={e => setForm({ ...form, recipes: e.target.value })} /></div>
+        <button className="primary" onClick={create}>+ create experiment</button>
+        {form.provider === "claude" && <span className="muted" style={{ marginLeft: 10, fontSize: 10 }}>Tip: use “run (no-cost)” to validate the Claude wiring without spending.</span>}
+      </div>
+
+      <div className="panel">
+        <h2>Experiments</h2>
+        {exps.length === 0 && <div className="muted">None yet.</div>}
+        <table><thead><tr><th>id / name</th><th>arm</th><th>model</th><th>recipes</th><th>shape</th><th></th></tr></thead><tbody>
+          {exps.map(x => (
+            <tr key={x.id}>
+              <td>{x.name || x.id}<div className="muted" style={{ fontSize: 10 }}>{x.id}</div></td>
+              <td><span className="badge blue">{x.arm}</span></td>
+              <td>{x.objective_model.provider}/{x.objective_model.model_id}</td>
+              <td>{(x.recipes || []).length}</td>
+              <td>{(x.meta || {}).shape || "presence"}</td>
+              <td style={{ whiteSpace: "nowrap" }}>
+                <button className="primary sm" onClick={() => run(x, false)}>▶ run</button>
+                <button className="sm" style={{ marginLeft: 4 }} onClick={() => run(x, true)}>run (no-cost)</button>
+                <button className="danger sm" style={{ marginLeft: 4 }} onClick={async () => { if (confirm("delete?")) { await jdel(`/experiments/${x.id}`); load(); } }}>×</button>
+              </td>
+            </tr>
+          ))}
+        </tbody></table>
+        {runningJob && (
+          <div style={{ marginTop: 10 }}>
+            <div className="muted" style={{ fontSize: 10, marginBottom: 3 }}>
+              {runningJob.no_cost ? "no-cost run" : "run"} · {runningJob.status} · {runningJob.current || ""}
+            </div>
+            <div className="progress">
+              <div className="fill" style={{ width: (runningJob.total ? (100 * runningJob.completed / runningJob.total) : 5) + "%" }}></div>
+              <div className="lbl">{runningJob.completed}/{runningJob.total || "?"}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------- //
+// RUNS tab                                                                    //
+// -------------------------------------------------------------------------- //
+function RunsTab({ toast }) {
+  const [runs, setRuns] = useState([]);
+  const [sel, setSel] = useState(null);
+  const load = useCallback(async () => { setRuns(await api("/runs")); }, []);
+  useEffect(() => { load().catch(e => toast(e.message)); }, []);
+
+  return (
+    <div className="grid2">
+      <div className="panel">
+        <h2>Runs</h2>
+        {runs.length === 0 && <div className="muted">No runs yet.</div>}
+        {runs.map(r => (
+          <div key={r.id} className={"list-item" + (sel && sel.id === r.id ? " sel" : "")} onClick={() => setSel(r)}>
+            <div style={{ flex: 1 }}>
+              <div>{r.pin.provider}/{r.pin.model_id} <span className={"badge " + (r.status === "done" ? "green" : r.status === "failed" ? "red" : "yellow")}>{r.status}</span></div>
+              <div className="muted" style={{ fontSize: 10 }}>{r.results.length} trials · {r.created_at && r.created_at.slice(0, 19).replace("T", " ")}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div>
+        {!sel && <div className="panel muted">Select a run to see results + the apples-to-apples pin.</div>}
+        {sel && (
+          <div>
+            <div className="panel">
+              <div className="panel-head"><h2>Run {sel.id}</h2>
+                <button className="danger sm" onClick={async () => { await jdel(`/runs/${sel.id}`); setSel(null); load(); }}>delete</button></div>
+              <div className="row">
+                <div style={{ flex: 1 }}><h3>ModelPin</h3>
+                  <div className="kv">
+                    <div className="k">provider</div><div>{sel.pin.provider}</div>
+                    <div className="k">model</div><div>{sel.pin.model_id}</div>
+                    <div className="k">quant</div><div>{sel.pin.quantization || "—"}</div>
+                    <div className="k">param size</div><div>{sel.pin.parameter_size || "—"}</div>
+                    <div className="k">digest</div><div className="mono" style={{ wordBreak: "break-all" }}>{(sel.pin.model_digest || "—").slice(0, 24)}</div>
+                    <div className="k">temp/seed</div><div>{sel.pin.temperature}/{sel.pin.seed == null ? "—" : sel.pin.seed}</div>
+                  </div></div>
+                <div style={{ flex: 1 }}><h3>RunEnvironment</h3>
+                  <div className="kv">
+                    <div className="k">gpu</div><div>{sel.env.gpu_model || "—"} {sel.env.gpu_vram_gb ? `(${sel.env.gpu_vram_gb}GB)` : ""}</div>
+                    <div className="k">ollama</div><div>{sel.env.ollama_version || "—"}</div>
+                    <div className="k">os</div><div>{sel.env.os || "—"}</div>
+                    <div className="k">endpoint</div><div className="mono" style={{ wordBreak: "break-all" }}>{sel.env.endpoint}</div>
+                    <div className="k">commit</div><div className="mono">{(sel.env.pipeline_git_commit || "").slice(0, 10)}</div>
+                    <div className="k">batch</div><div>{String(sel.env.batch)}</div>
+                  </div></div>
+              </div>
+            </div>
+            <div className="panel">
+              <h3>Trials</h3>
+              <table><thead><tr><th>episode</th><th>recipe</th><th>match</th><th>gt</th><th>✓</th><th>tokens</th><th>cost</th><th>ms</th></tr></thead><tbody>
+                {sel.results.map(t => (
+                  <tr key={t.id}>
+                    <td className="mono">{t.episode_id.slice(-6)}</td>
+                    <td style={{ maxWidth: 220 }}>{t.recipe_text}</td>
+                    <td>{t.error ? <span className="badge red">err</span> : String(t.decision && t.decision.match)}</td>
+                    <td>{t.ground_truth == null ? "—" : String(t.ground_truth)}</td>
+                    <td>{t.correct == null ? "—" : (t.correct ? "✓" : "✗")}</td>
+                    <td>{t.tokens && t.tokens.total_tokens}</td>
+                    <td>${(t.cost_usd || 0).toFixed(5)}</td>
+                    <td>{Math.round(t.latency_ms)}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------- //
+// MATRIX tab: the shape x arm x spec deliverable                              //
+// -------------------------------------------------------------------------- //
+function MatrixTab({ toast }) {
+  const [m, setM] = useState(null);
+  const load = useCallback(async () => { setM(await api("/matrix")); }, []);
+  useEffect(() => { load().catch(e => toast(e.message)); }, []);
+  if (!m) return <div className="panel muted">loading…</div>;
+  if (!m.cells.length) return <div className="panel muted">No results yet — run an experiment to populate the matrix.</div>;
+
+  const accClass = (a) => a == null ? "na" : a >= 0.8 ? "hi" : a >= 0.5 ? "mid" : "lo";
+  return (
+    <div className="panel">
+      <div className="panel-head"><h2>Results matrix — question-shape × arm × spec</h2><button className="sm" onClick={load}>↻ refresh</button></div>
+      <table><thead><tr>
+        <th>shape</th><th>arm</th><th>spec (fps/fpe/res)</th><th>accuracy</th><th>n</th><th>scored</th><th>errors</th><th>mean cost</th><th>mean ms</th><th>tokens</th>
+      </tr></thead><tbody>
+        {m.cells.map((c, i) => (
+          <tr key={i}>
+            <td><span className="badge purple">{c.shape}</span></td>
+            <td><span className="badge blue">{c.arm}</span></td>
+            <td className="mono">{c.spec}</td>
+            <td><span className={"acc " + accClass(c.accuracy)} style={{ fontSize: 16, fontWeight: 700 }}>{c.accuracy == null ? "n/a" : (100 * c.accuracy).toFixed(0) + "%"}</span></td>
+            <td>{c.n}</td><td>{c.scored}</td><td>{c.errors}</td>
+            <td>${(c.mean_cost_usd || 0).toFixed(5)}</td>
+            <td>{Math.round(c.mean_latency_ms)}</td>
+            <td>{c.input_tokens + c.output_tokens}</td>
+          </tr>
+        ))}
+      </tbody></table>
+      <div className="muted" style={{ fontSize: 10, marginTop: 8 }}>
+        Accuracy is over scorable trials (episodes whose window overlaps a label). Cost: API arms bill real Anthropic token prices (Batch = 50% off); local arms use a wall-clock proxy.
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------- //
+// App shell                                                                   //
+// -------------------------------------------------------------------------- //
+function App() {
+  const [tab, setTab] = useState("datasets");
+  const [toast, toastView] = useToasts();
+  const [models, setModels] = useState([]);
+  const [arms, setArms] = useState({ known: [], implemented: [] });
+  const [focusDer, setFocusDer] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/models").then(r => r.json()).then(setModels).catch(() => {});
+    api("/arms").then(setArms).catch(() => {});
+  }, []);
+
+  const goDerivation = (id) => { setFocusDer(id); setTab("derivations"); };
+  const goExperiment = (id) => { setFocusDer(id); setTab("experiments"); };
+
+  const tabs = [
+    ["datasets", "1", "Datasets"],
+    ["derivations", "2", "Derivations"],
+    ["experiments", "3", "Experiments"],
+    ["runs", "4", "Runs"],
+    ["matrix", "5", "Matrix"],
+  ];
+
+  return (
+    <div className="wrap">
+      {toastView}
+      <div className="topbar">
+        <h1>🔴 OpenMartian — Experiment Console</h1>
+        <div className="muted" style={{ fontSize: 11 }}><a href="/">← episode debug console</a> · <a href="/docs" target="_blank">API</a></div>
+      </div>
+      <div className="muted" style={{ fontSize: 11, marginBottom: 10 }}>
+        upload raw video → label by time → derive episodes (fps/fpe sweep) → run experiments (recipe-conditioned VLM) → read the shape×arm×spec matrix
+      </div>
+      <div className="tabs">
+        {tabs.map(([k, n, lbl]) => <div key={k} className={"tab" + (tab === k ? " active" : "")} onClick={() => setTab(k)}><span className="step">{n}</span>{lbl}</div>)}
+      </div>
+      {tab === "datasets" && <DatasetsTab toast={toast} onSelectDerive={goDerivation} />}
+      {tab === "derivations" && <DerivationsTab toast={toast} focusDer={focusDer} onMakeExperiment={goExperiment} />}
+      {tab === "experiments" && <ExperimentsTab toast={toast} focusDer={focusDer} models={models} arms={arms} />}
+      {tab === "runs" && <RunsTab toast={toast} />}
+      {tab === "matrix" && <MatrixTab toast={toast} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

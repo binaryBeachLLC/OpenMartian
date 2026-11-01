@@ -9,6 +9,12 @@ all OpenMartian software (firmware and later stages live alongside `v0/`).
 webcam (RTSP) ──capture──▶ episodes on disk ──process──▶ recipe-conditioned VLM ──▶ deterministic dispatch
 ```
 
+> **Experiment platform.** Built on top of this same pipeline:
+> [`docs/Open_Martian_Experiment_App_and_Compute_Design.md`](../../docs/Open_Martian_Experiment_App_and_Compute_Design.md)
+> — upload **raw video** → label by time → derive episode sets (fps/fpe sweep) →
+> run experiments → read the shape×arm×spec results matrix. It **invokes this
+> pipeline, never reforks it**. See [Experiment Console](#experiment-console-the-platform) below.
+
 **What v0 proves:** does *recipe-conditioned querying* actually detect what the
 recipe asked for ("Is there a man standing in the frame?") and not what it
 didn't — across local (Ollama) and cloud (Claude) models, on the same frames.
@@ -158,8 +164,69 @@ episodes under `v0/episodes/`. Both are git-ignored.
 > Security note: no auth, CORS `*`, `0.0.0.0` bind — intended only for your own
 > trusted NetBird network, exactly as requested.
 
+## Experiment Console (the platform)
+
+The bespoke shell from
+[`docs/Open_Martian_Experiment_App_and_Compute_Design.md`](../../docs/Open_Martian_Experiment_App_and_Compute_Design.md).
+Its load-bearing rule (PART B): **the app invokes the pipeline, never reimplements
+it** — the orchestrator imports the same `Episode`, `build_prompt`, `build_llm`,
+and `Decision` modules the webcam path uses, so the benchmark measures exactly what
+ships. The input changed from webcam to **uploaded raw video**; everything
+downstream is unchanged.
+
+```
+raw video ─derive─▶ episode set ─run(arm)─▶ recipe-conditioned VLM ─score─▶ shape×arm×spec matrix
+   (Dataset)         (Derivation)            (Experiment → Run)            (Results)
+```
+
+**UI:** `make up`, then open **`http://<host>:8000/experiment`** (the original
+episode-debug console stays at `/`). Five steps mirror the data model:
+
+1. **Datasets** — create a dataset, **upload a raw video**, add **time-keyed
+   labels** (the ground truth; keyed to source-video time so every sweep inherits
+   them).
+2. **Derivations** — sample a video into an episode set at a `SamplingSpec`
+   (fps / frames-per-episode / resolution) — *record high, sample down*; browse the
+   derived frames.
+3. **Experiments** — pick an **arm** + **model** (local Ollama or paid Claude) +
+   **recipes** (the recipe-conditioned questions). Run live, or **run (no-cost)** to
+   exercise the whole graph (incl. the paid Claude wiring) without spending.
+4. **Runs** — per-trial results + the auto-captured **`ModelPin` + `RunEnvironment`**
+   (PART F: exact model digest/quant, GPU, OS, git commit — the apples-to-apples
+   record).
+5. **Matrix** — the **question-shape × arm × spec** results matrix: accuracy, cost
+   (real Anthropic prices, Batch = 50% off; local arms use a wall-clock proxy),
+   latency, tokens.
+
+**Core package** (`openmartian/experiment/` — pure orchestration around the pipeline):
+
+| File | Role |
+|---|---|
+| `models.py` | the graph dataclasses (`Dataset`/`Derivation`/`Experiment`/`Run`/`TrialResult`) + `SamplingSpec`/`Label`/`ModelPin`/`RunEnvironment` — **`meta`/`notes` at every level** |
+| `video.py` | `VideoEpisodeSource` — ffmpeg samples a raw video into `Episode`s (the webcam's offline twin; reuses `save_episode`) |
+| `labels.py` | time-keyed ground truth + the **Label Studio** post-processor seam |
+| `pin.py` | PART-F auto-capture probes (Ollama `/api/show`, nvidia-smi, host, git) |
+| `runner.py` | PART-G `Runner` seam (`LocalRunner` now; Queue/Modal stubs) + `FakeLLMClient` (no-cost) |
+| `tracking.py` | the results-matrix aggregation, the cost model, and the **MLflow** tracker seam |
+| `orchestrator.py` | `derive` / `run_experiment` / `matrix` — the one place the graph executes |
+| `store.py` | JSON persistence (SQLite is the documented upgrade) |
+
+**Adopted tools are seams, not requirements** (PART D): Label Studio and MLflow plug
+in behind `LabelSource` / `Tracker`, but the built-in fallbacks keep the whole
+platform smoke-testable **offline** — exactly the build-order the doc asks for.
+
+**Smoke tests:** `make test` (or `python3 -m pytest tests/`) synthesizes a video and
+walks *upload → derive → label → run → matrix* end to end, including a
+monkeypatched check that the **paid Claude request is built correctly without ever
+sending a costing call**.
+
+**Agent-drivable:** the whole platform is REST under `/api/experiment/*`
+(`/docs` for Swagger) — datasets, video upload, labels, derive, run, matrix.
+
 ## Grows into
 
 Same `Episode` seam and recipe-conditioned call expand into PART 7 (full
 gate→interpret→match cascade) then PART 8 (peripheral/foveal attention) with no
-rework — see the simplification ladder in §8.9.
+rework — see the simplification ladder in §8.9. The experiment graph's arm registry
+(`orchestrator.KNOWN_ARMS`) grows the pyramid / caption-RAG / vision-RAG arms into
+new cells of the same matrix without touching the orchestrator.

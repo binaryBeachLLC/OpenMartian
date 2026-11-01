@@ -7,6 +7,16 @@ python-dotenv>=1.0   # optional: auto-loads .env if present
 # Dev console web server (server/)
 fastapi>=0.110
 uvicorn>=0.27
+python-multipart>=0.0.9   # video upload (multipart/form-data) in the experiment console
+
+# Tests
+pytest>=8.0
+
+# Optional adopted tools (PART D of the experiment design) — only needed to wire
+# the seams to the real services; built-in fallbacks keep the platform fully
+# offline without them:
+#   mlflow         experiment tracking server  (experiment.tracking.MLflowTracker)
+#   label-studio   annotation UI               (experiment.labels.LabelStudioSource)
 
 # System deps (NOT pip):
 #   - ffmpeg   : RTSP frame capture (already present; your `webcam` alias uses ffplay)

@@ -13,7 +13,7 @@ VPN_IP := $(shell ip -4 addr show wt0 2>/dev/null | grep -oP 'inet \K[0-9.]+' | 
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install up serve dev check ollama models pull-models capture list process url clean clean-data
+.PHONY: help install up serve dev check ollama models pull-models capture list process url clean clean-data test experiment
 
 help: ## Show this help + access URLs
 	@echo "OpenMartian dev console — targets:"
@@ -37,6 +37,13 @@ serve: ## Serve the web UI + API, bound to $(HOST):$(PORT) (reachable over the V
 
 dev: ## Serve with auto-reload (local development)
 	$(PY) -m uvicorn webapp.app:app --host $(HOST) --port $(PORT) --reload
+
+test: ## Run the experiment-platform smoke tests (synthetic video; no paid API calls)
+	$(PY) -m pytest tests/ -q
+
+experiment: ## Print the Experiment Console URL (upload video -> label -> derive -> run -> matrix)
+	@echo "  Experiment Console : http://localhost:$(PORT)/experiment"
+	@echo "  (start it with 'make up' or 'make serve' first)"
 
 check: ## Verify ffmpeg, ollama, and the Claude key are ready
 	@command -v ffmpeg >/dev/null && echo "ffmpeg     : ok" || echo "ffmpeg     : MISSING"
